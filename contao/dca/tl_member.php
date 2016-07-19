@@ -43,24 +43,32 @@ class tl_member extends \tl_member
     {
         $arrAllMounts = array();
 
-        if ($this->User->isAdmin) {
-            $objResult = \MemberGroupModel::findAll();
-            while($objResult->next()) {
-                $arrAllMounts[$objResult->id] = $objResult->name;
+        if (TL_MODE == 'FE') {
+            $this->import('FrontendUser', 'TheUser');
+            $modelClass = '\MemberGroupModel';
+        } else {
+            $this->import('BackendUser', 'TheUser');
+            $modelClass = '\UserGroupModel';
+
+            if ($this->TheUser->isAdmin) {
+                $objResult = \MemberGroupModel::findAll();
+                while($objResult->next()) {
+                    $arrAllMounts[$objResult->id] = $objResult->name;
+                }
+                return $arrAllMounts;
             }
-            return $arrAllMounts;
         }
 
-        $arrGroups = deserialize($this->User->groups);
+        $arrGroups = deserialize($this->TheUser->groups);
         // merge member group mounts of all user groups we are member in
         foreach($arrGroups as $intGroup) {
-            $objGroup = \UserGroupModel::findByPk($intGroup);
+            $objGroup = $modelClass::findByPk($intGroup);
             $arrMounts = deserialize($objGroup->member_group_mounts);
             if (empty($arrMounts)) {
                 $arrMounts = array();
             }
             foreach($arrMounts as $intMountId) {
-                $objGroupMounted = \MemberGroupModel::findByPk($intMountId);
+                $objGroupMounted = $modelClass::findByPk($intMountId);
                 $arrAllMounts[$intMountId] = $objGroupMounted->name;
             }
         }
@@ -80,7 +88,12 @@ class tl_member extends \tl_member
             return $strData;
         }
 
-        $arrData = unserialize($strData);
+        if (!($wasArray = is_array($strData))) {
+            $arrData = unserialize($strData);
+
+        } else {
+            $arrData = $strData;
+        }
         if (empty($arrData)) {
             $arrData = array();
 
@@ -91,6 +104,9 @@ class tl_member extends \tl_member
                 $arrData[] = $oldGroup;
 
             }
+        }
+        if ($wasArray) {
+            return $arrData;
         }
         return serialize($arrData);
     }
